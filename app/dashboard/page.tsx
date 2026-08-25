@@ -12,9 +12,11 @@ import { CandidateComparisonModal } from '@/components/candidate-comparison-moda
 import { CandidateAnalyticsModal } from '@/components/candidate-analytics-modal';
 import { PoolAnalyticsWidget } from '@/components/pool-analytics-widget';
 import { RankChangeTracker } from '@/components/rank-change-tracker';
+import { AICandidateAdvisor } from '@/components/ai-candidate-advisor';
+import { ArchitectureModal } from '@/components/architecture-modal';
 import { ProfileModal } from '@/components/profile-modal';
 import { ProjectModal } from '@/components/project-modal';
-import { UserPlus, FolderPlus, RotateCcw, Cpu, Sparkles, Filter, Briefcase, CheckCircle2, BarChart2, LayoutGrid, PieChart, GitCompare, PlayCircle } from 'lucide-react';
+import { UserPlus, FolderPlus, RotateCcw, Cpu, Sparkles, Filter, Briefcase, CheckCircle2, BarChart2, LayoutGrid, PieChart, GitCompare, Bot, Info } from 'lucide-react';
 import { INITIAL_PROFILES, INITIAL_PROJECTS } from '@/lib/seed-data';
 
 export default function DashboardPage() {
@@ -35,6 +37,10 @@ export default function DashboardPage() {
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [selectedForCompare, setSelectedForCompare] = useState<string[]>([]);
   const [isCompareModalOpen, setIsCompareModalOpen] = useState(false);
+
+  // AI Advisor Drawer & Architecture Specs Modal
+  const [isAIAdvisorOpen, setIsAIAdvisorOpen] = useState(false);
+  const [isArchitectureModalOpen, setIsArchitectureModalOpen] = useState(false);
 
   // Rank Change Tracking
   const [rankChanges, setRankChanges] = useState<RankChangeItem[]>([]);
@@ -141,6 +147,26 @@ export default function DashboardPage() {
 
         {/* Action Controls */}
         <div className="flex flex-wrap items-center gap-3">
+          {/* Prominent Ask AI Advisor Button */}
+          <button
+            onClick={() => setIsAIAdvisorOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-500 via-purple-600 to-cyan-500 hover:from-indigo-400 hover:to-cyan-400 text-slate-950 font-bold text-xs shadow-lg shadow-purple-500/20 transition-all hover:scale-105"
+          >
+            <Bot className="w-4 h-4 text-slate-950" />
+            Ask AI Advisor
+          </button>
+
+          {/* Architecture Info Button (ⓘ) */}
+          <button
+            onClick={() => setIsArchitectureModalOpen(true)}
+            className="w-9 h-9 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-indigo-400 hover:text-white flex items-center justify-center transition-all hover:scale-110"
+            title="View Architecture Specifications (ⓘ)"
+          >
+            <Info className="w-4.5 h-4.5" />
+          </button>
+
+          <div className="h-4 w-[1px] bg-slate-800" />
+
           <button
             onClick={() => setIsProfileModalOpen(true)}
             className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-cyan-950 hover:bg-cyan-900 border border-cyan-800 text-cyan-300 text-xs font-semibold transition-all"
@@ -353,7 +379,19 @@ export default function DashboardPage() {
         <PoolAnalyticsWidget analytics={poolAnalytics} project={selectedProject} />
       )}
 
-      {/* Modals */}
+      {/* Modals & AI Advisor Drawer */}
+      <AICandidateAdvisor
+        isOpen={isAIAdvisorOpen}
+        onClose={() => setIsAIAdvisorOpen(false)}
+        project={selectedProject}
+        matchResults={matchResults}
+      />
+
+      <ArchitectureModal
+        isOpen={isArchitectureModalOpen}
+        onClose={() => setIsArchitectureModalOpen(false)}
+      />
+
       <CandidateAnalyticsModal
         isOpen={isDetailModalOpen}
         onClose={() => setIsDetailModalOpen(false)}
