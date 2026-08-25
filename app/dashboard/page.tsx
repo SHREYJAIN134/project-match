@@ -1,16 +1,20 @@
 'use client';
 
-import React, { useState, useEffect, useTransition } from 'react';
-import { Profile, Project, MatchScoreResult, PlaygroundWeights } from '@/types';
-import { DEFAULT_WEIGHTS, runMatchingPipeline } from '@/lib/matching';
+import React, { useState, useEffect, useTransition, useRef } from 'react';
+import { Profile, Project, MatchScoreResult, PlaygroundWeights, ProjectPoolAnalytics, RankChangeItem } from '@/types';
+import { DEFAULT_WEIGHTS, runMatchingPipeline, calculateProjectPoolAnalytics, calculateBeforeAfterRankings } from '@/lib/matching';
 import { enrichResultsWithExplanations } from '@/lib/llm-explanation';
 import { fetchProfiles, fetchProjects, createProfile, createProject, resetToSeedData } from '@/lib/supabase';
 import { ArchitecturePlayground } from '@/components/architecture-playground';
 import { CandidateCard } from '@/components/candidate-card';
+import { CandidateComparisonTable } from '@/components/candidate-comparison-table';
+import { CandidateComparisonModal } from '@/components/candidate-comparison-modal';
+import { CandidateAnalyticsModal } from '@/components/candidate-analytics-modal';
+import { PoolAnalyticsWidget } from '@/components/pool-analytics-widget';
+import { RankChangeTracker } from '@/components/rank-change-tracker';
 import { ProfileModal } from '@/components/profile-modal';
 import { ProjectModal } from '@/components/project-modal';
-import { UserPlus, FolderPlus, RotateCcw, Cpu, Sparkles, Filter, Briefcase, CheckCircle2 } from 'lucide-react';
-
+import { UserPlus, FolderPlus, RotateCcw, Cpu, Sparkles, Filter, Briefcase, CheckCircle2, BarChart2, LayoutGrid, PieChart, GitCompare, PlayCircle } from 'lucide-react';
 import { INITIAL_PROFILES, INITIAL_PROJECTS } from '@/lib/seed-data';
 
 export default function DashboardPage() {
@@ -19,10 +23,24 @@ export default function DashboardPage() {
   const [selectedProjectId, setSelectedProjectId] = useState<string>(INITIAL_PROJECTS[0]?.id || '');
   const [weights, setWeights] = useState<PlaygroundWeights>(DEFAULT_WEIGHTS);
   const [includeUnderAvailable, setIncludeUnderAvailable] = useState<boolean>(false);
-  const [matchResults, setMatchResults] = useState<MatchScoreResult[]>(() => 
+  const [matchResults, setMatchResults] = useState<MatchScoreResult[]>(() =>
     INITIAL_PROJECTS[0] ? runMatchingPipeline(INITIAL_PROFILES, INITIAL_PROJECTS[0], DEFAULT_WEIGHTS, false) : []
   );
 
+  // Analytics View Modes: 'cards' | 'table' | 'pool'
+  const [viewMode, setViewMode] = useState<'cards' | 'table' | 'pool'>('cards');
+
+  // Candidate Selection & Modals State
+  const [selectedCandidateDetail, setSelectedCandidateDetail] = useState<MatchScoreResult | null>(null);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [selectedForCompare, setSelectedForCompare] = useState<string[]>([]);
+  const [isCompareModalOpen, setIsCompareModalOpen] = useState(false);
+
+  // Rank Change Tracking
+  const [rankChanges, setRankChanges] = useState<RankChangeItem[]>([]);
+  const previousMatchesRef = useRef<MatchScoreResult[]>(matchResults);
+
+  // Modals for creation
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
@@ -46,8 +64,15 @@ export default function DashboardPage() {
     const selectedProject = projects.find((p) => p.id === selectedProjectId);
     if (!selectedProject || profiles.length === 0) return;
 
-    // Phase 2 Matching Pipeline
+    // Phase 2 Matching Pipeline with Analytics
     const computedMatches = runMatchingPipeline(profiles, selectedProject, weights, includeUnderAvailable);
+
+    // Track Rank Shifts from previous matches
+    if (previousMatchesRef.current.length > 0) {
+      const changes = calculateBeforeAfterRankings(previousMatchesRef.current, computedMatches);
+      setRankChanges(changes);
+    }
+    previousMatchesRef.current = computedMatches;
 
     // Enrich top 5 matches with LLM complementarity rationales
     startTransition(async () => {
@@ -57,6 +82,11 @@ export default function DashboardPage() {
   }, [profiles, projects, selectedProjectId, weights, includeUnderAvailable]);
 
   const selectedProject = projects.find((p) => p.id === selectedProjectId);
+
+  // Pool Analytics
+  const poolAnalytics: ProjectPoolAnalytics | null = selectedProject
+    ? calculateProjectPoolAnalytics(profiles, selectedProject)
+    : null;
 
   const handleAddProfile = async (newProf: Omit<Profile, 'id'>) => {
     const saved = await createProfile(newProf);
@@ -78,7 +108,23 @@ export default function DashboardPage() {
     });
     setWeights(DEFAULT_WEIGHTS);
     setIncludeUnderAvailable(false);
+    setSelectedForCompare([]);
+    setRankChanges([]);
   };
+
+  const handleToggleCompare = (profileId: string) => {
+    if (selectedForCompare.includes(profileId)) {
+      setSelectedForCompare(selectedForCompare.filter((id) => id !== profileId));
+    } else {
+      if (selectedForCompare.length >= 3) {
+        alert('You can compare a maximum of 3 candidates at a time.');
+        return;
+      }
+      setSelectedForCompare([...selectedForCompare, profileId]);
+    }
+  };
+
+  const selectedCompareMatches = matchResults.filter((m) => selectedForCompare.includes(m.profile.id));
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -86,10 +132,10 @@ export default function DashboardPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight flex items-center gap-3">
-            Matching Dashboard & Architecture Playground
+            Candidate Suitability Analytics Platform
           </h1>
           <p className="text-xs text-slate-400 font-mono mt-1">
-            Real-time candidate score synthesis & dynamic weight control engine
+            Event-Driven Hybrid-Intelligence Matching & Multi-Candidate Intelligence Engine
           </p>
         </div>
 
@@ -158,7 +204,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Selected Project Specs Header */}
+      {/* Active Project Specs */}
       {selectedProject && (
         <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-5 mb-8 flex flex-wrap items-center justify-between gap-4">
           <div>
@@ -171,7 +217,7 @@ export default function DashboardPage() {
 
           <div className="flex flex-wrap items-center gap-2 font-mono text-xs">
             <span className="px-2.5 py-1 rounded-lg bg-slate-950 border border-slate-800 text-slate-300">
-              Commitment: <strong className="text-cyan-400">{selectedProject.required_hours}h/wk</strong>
+              Required Commitment: <strong className="text-cyan-400">{selectedProject.required_hours}h/wk</strong>
             </span>
             <span className="px-2.5 py-1 rounded-lg bg-slate-950 border border-slate-800 text-slate-300">
               Critical Skills: <strong className="text-emerald-400">{selectedProject.critical_skills.join(', ')}</strong>
@@ -181,7 +227,7 @@ export default function DashboardPage() {
       )}
 
       {/* Interactive Architecture Playground */}
-      <div className="mb-10">
+      <div className="mb-6">
         <ArchitecturePlayground
           weights={weights}
           includeUnderAvailable={includeUnderAvailable}
@@ -195,47 +241,137 @@ export default function DashboardPage() {
         />
       </div>
 
-      {/* Candidate Results Grid */}
-      <div>
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <Cpu className="w-4 h-4 text-cyan-400" />
-            <h2 className="text-lg font-bold text-white">
-              Ranked Candidate Results
-            </h2>
-            <span className="text-xs font-mono bg-cyan-950 text-cyan-300 border border-cyan-800 px-2 py-0.5 rounded-full">
-              {matchResults.length} Qualified Candidates
-            </span>
-          </div>
+      {/* Live Rank Change Tracker */}
+      <div className="mb-8">
+        <RankChangeTracker rankChanges={rankChanges} />
+      </div>
 
-          <p className="text-xs font-mono text-slate-500">
-            Sorted strictly by mathematical totalScore desc
-          </p>
+      {/* Analytics View Mode Switcher */}
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+        <div className="flex items-center gap-2 bg-slate-900 p-1.5 rounded-2xl border border-slate-800">
+          <button
+            onClick={() => setViewMode('cards')}
+            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+              viewMode === 'cards'
+                ? 'bg-cyan-500 text-slate-950 shadow-md font-bold'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <LayoutGrid className="w-4 h-4" />
+            Ranked Cards
+          </button>
+
+          <button
+            onClick={() => setViewMode('table')}
+            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+              viewMode === 'table'
+                ? 'bg-cyan-500 text-slate-950 shadow-md font-bold'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <BarChart2 className="w-4 h-4" />
+            Analytical Table
+          </button>
+
+          <button
+            onClick={() => setViewMode('pool')}
+            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+              viewMode === 'pool'
+                ? 'bg-cyan-500 text-slate-950 shadow-md font-bold'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <PieChart className="w-4 h-4" />
+            Product Pool Analytics
+          </button>
         </div>
 
-        {matchResults.length === 0 ? (
-          <div className="text-center py-16 bg-slate-900/40 border border-slate-800 rounded-2xl">
-            <Filter className="w-8 h-8 text-slate-600 mx-auto mb-3" />
-            <h3 className="text-base font-bold text-slate-300">No candidates match current gate criteria</h3>
-            <p className="text-xs text-slate-500 max-w-md mx-auto mt-1">
-              Try reducing the Minimum Score Gate slider or checking &quot;Show under-available candidates&quot;.
-            </p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {matchResults.map((result, idx) => (
-              <CandidateCard key={result.profile.id} matchResult={result} rank={idx + 1} />
-            ))}
-          </div>
+        {selectedForCompare.length > 0 && (
+          <button
+            onClick={() => setIsCompareModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-lg shadow-indigo-500/20"
+          >
+            <GitCompare className="w-4 h-4" />
+            Compare Selected ({selectedForCompare.length})
+          </button>
         )}
       </div>
 
+      {/* Main Analytics View Content */}
+      {viewMode === 'cards' && (
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Cpu className="w-4 h-4 text-cyan-400" />
+              <h2 className="text-lg font-bold text-white">
+                Evaluated Candidate Suitability Cards
+              </h2>
+              <span className="text-xs font-mono bg-cyan-950 text-cyan-300 border border-cyan-800 px-2 py-0.5 rounded-full">
+                {matchResults.length} Evaluated
+              </span>
+            </div>
+            <p className="text-xs font-mono text-slate-500">
+              Click &quot;Detail&quot; on any card to view complete suitability breakdown
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {matchResults.map((result, idx) => (
+              <div key={result.profile.id} className="relative group">
+                <CandidateCard matchResult={result} rank={idx + 1} />
+                <div className="absolute top-6 right-20">
+                  <button
+                    onClick={() => {
+                      setSelectedCandidateDetail(result);
+                      setIsDetailModalOpen(true);
+                    }}
+                    className="px-3 py-1 rounded-lg bg-slate-950/90 hover:bg-cyan-500 hover:text-slate-950 border border-cyan-800 text-cyan-400 text-xs font-mono font-bold transition-all shadow-md"
+                  >
+                    Deep Analytics &rarr;
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {viewMode === 'table' && (
+        <CandidateComparisonTable
+          matchResults={matchResults}
+          onSelectCandidateForDetail={(res) => {
+            setSelectedCandidateDetail(res);
+            setIsDetailModalOpen(true);
+          }}
+          selectedForCompare={selectedForCompare}
+          onToggleCompare={handleToggleCompare}
+          onOpenCompareModal={() => setIsCompareModalOpen(true)}
+        />
+      )}
+
+      {viewMode === 'pool' && poolAnalytics && selectedProject && (
+        <PoolAnalyticsWidget analytics={poolAnalytics} project={selectedProject} />
+      )}
+
       {/* Modals */}
+      <CandidateAnalyticsModal
+        isOpen={isDetailModalOpen}
+        onClose={() => setIsDetailModalOpen(false)}
+        matchResult={selectedCandidateDetail}
+      />
+
+      <CandidateComparisonModal
+        isOpen={isCompareModalOpen}
+        onClose={() => setIsCompareModalOpen(false)}
+        selectedMatches={selectedCompareMatches}
+      />
+
       <ProfileModal
         isOpen={isProfileModalOpen}
         onClose={() => setIsProfileModalOpen(false)}
         onAddProfile={handleAddProfile}
       />
+
       <ProjectModal
         isOpen={isProjectModalOpen}
         onClose={() => setIsProjectModalOpen(false)}

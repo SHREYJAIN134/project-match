@@ -32,6 +32,38 @@ export interface PlaygroundWeights {
   criticalBonusWeight: number; // 0 to 30%
 }
 
+export type SuitabilityLevel = 'Excellent Fit' | 'Strong Fit' | 'Moderate Fit' | 'Weak Fit' | 'Not Suitable';
+export type SkillMatchLevel = 'strong' | 'partial' | 'missing' | 'complementary';
+
+export interface SkillAnalysisItem {
+  skill: string;
+  category: 'required' | 'critical' | 'complementary';
+  matchLevel: SkillMatchLevel;
+  detail: string;
+}
+
+export interface CandidateSuitabilityProfile {
+  suitabilityLevel: SuitabilityLevel;
+  skillCoveragePct: number; // 0 to 100%
+  directMatchCount: number;
+  missingSkillCount: number;
+  complementarySkillCount: number;
+  directMatchedSkills: string[];
+  missingSkills: string[];
+  complementarySkills: string[];
+  experienceQualified: boolean;
+  scoreBreakdown: {
+    skillFitScore: number;
+    availabilityScore: number;
+    experienceScore: number;
+    criticalBonusScore: number;
+  };
+  skillAnalysis: SkillAnalysisItem[];
+  strengths: string[];
+  gaps: string[];
+  recommendation: string;
+}
+
 export interface MatchScoreResult {
   profile: Profile;
   project: Project;
@@ -44,4 +76,40 @@ export interface MatchScoreResult {
   hardGated: boolean; // True if skill overlap < 30% capping score at max 40%
   availabilityQualified: boolean; // True if availability_hours >= project.required_hours
   llmExplanation?: string;
+  suitabilityProfile?: CandidateSuitabilityProfile;
+}
+
+export interface ProjectPoolAnalytics {
+  totalEvaluated: number;
+  eligibleCount: number;
+  hardFilteredCount: number;
+  averageScore: number;
+  medianScore: number;
+  fitDistribution: {
+    excellent: number;
+    strong: number;
+    moderate: number;
+    weak: number;
+    notSuitable: number;
+  };
+  skillGapFrequencies: {
+    skill: string;
+    missingCount: number;
+    missingPct: number;
+  }[];
+  topComplementarySkills: {
+    skill: string;
+    count: number;
+  }[];
+}
+
+export interface RankChangeItem {
+  profileId: string;
+  profileName: string;
+  avatarUrl: string;
+  previousRank: number;
+  newRank: number;
+  rankDelta: number; // e.g. +2 means moved up 2 places, -1 means moved down
+  previousScore: number;
+  newScore: number;
 }
