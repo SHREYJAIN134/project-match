@@ -113,3 +113,72 @@ export interface RankChangeItem {
   previousScore: number;
   newScore: number;
 }
+
+/* =========================================================================
+   NEW PROJECT INTELLIGENCE & MANAGEMENT TYPES
+   ========================================================================= */
+
+export type TaskStatus = 'To Do' | 'In Progress' | 'Completed' | 'Delayed' | 'Blocked';
+export type TaskPriority = 'Low' | 'Medium' | 'High' | 'Critical';
+export type ProjectHealthStatus = 'On Track' | 'At Risk' | 'Delayed' | 'Completed';
+
+export interface ProjectTask {
+  id: string;
+  projectId: string;
+  title: string;
+  description: string;
+  assignedToName: string;
+  assignedToAvatar: string;
+  priority: TaskPriority;
+  status: TaskStatus;
+  startDate: string;
+  deadline: string; // YYYY-MM-DD
+  completionPct: number; // 0 to 100
+  dependencies: string[]; // Array of task IDs this task depends on
+  lastUpdated: string;
+  blockerComment?: string;
+}
+
+export interface ProjectHealthMetrics {
+  healthScore: number; // 0 to 100%
+  healthStatus: ProjectHealthStatus;
+  totalTasks: number;
+  completedTasks: number;
+  inProgressTasks: number;
+  delayedTasks: number;
+  blockedTasks: number;
+  overdueTasks: number;
+  highRiskTasks: number;
+  completionPct: number;
+}
+
+export interface TeamWorkloadItem {
+  employeeName: string;
+  title: string;
+  avatarUrl: string;
+  assignedTaskCount: number;
+  activeTaskCount: number;
+  completedTaskCount: number;
+  overdueTaskCount: number;
+  highPriorityCount: number;
+  workloadStatus: 'Optimal' | 'High' | 'Overloaded';
+}
+
+export interface SmartAlertItem {
+  id: string;
+  severity: 'Critical' | 'Warning' | 'Attention' | 'Positive';
+  title: string;
+  description: string;
+  taskId?: string;
+  timestamp: string;
+}
+
+export interface ProjectActivityItem {
+  id: string;
+  timestamp: string;
+  actorName: string;
+  actorAvatar: string;
+  actionType: string;
+  taskTitle: string;
+  description: string;
+}

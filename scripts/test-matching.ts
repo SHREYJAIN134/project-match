@@ -9,13 +9,15 @@ import {
   DEFAULT_WEIGHTS,
 } from '../lib/matching';
 import {
-  generateInitialAdvisorSummary,
-  answerAdvisorQuestion,
-  generateTeamRecommendation,
-} from '../lib/llm-advisor';
+  calculateProjectHealth,
+  evaluateTaskDeadlineStatus,
+  calculateTeamWorkload,
+  generateSmartAlerts,
+  INITIAL_PROJECT_TASKS,
+} from '../lib/project-intelligence';
 
 console.log('====================================================');
-console.log('ProjectMatch AI Decision Advisor & Engine Verification');
+console.log('ProjectMatch Complete Intelligence Unit Tests');
 console.log('====================================================');
 
 const testProject = INITIAL_PROJECTS[0];
@@ -36,53 +38,56 @@ if (jaccardResult.intersectionCount === 3) {
   console.error('❌ TEST 1 FAILED!');
 }
 
-// Test 2: AI Advisor Initial Summary Generation
-async function testAdvisorInit() {
-  const initMsg = await generateInitialAdvisorSummary(testProject, matchResults);
-  console.log('\nTest 2: AI Advisor Initial Summary Generation:');
-  console.log(`- Badges generated: ${initMsg.badges?.map((b) => b.label).join(' | ')}`);
-  console.log(`- Summary length: ${initMsg.text.length} chars`);
+// Test 2: Project Health Score Calculation
+const health = calculateProjectHealth(INITIAL_PROJECT_TASKS, testProject);
+console.log('\nTest 2: Project Health Score Calculation:');
+console.log(`- Total Tasks: ${health.totalTasks}`);
+console.log(`- Completed: ${health.completedTasks}, Active: ${health.inProgressTasks}, Delayed: ${health.delayedTasks}, Blocked: ${health.blockedTasks}`);
+console.log(`- Health Score: ${health.healthScore}% (${health.healthStatus})`);
 
-  if (initMsg.text.includes('Decision Advisor Summary') && (initMsg.badges?.length || 0) > 0) {
-    console.log('✅ TEST 2 PASSED: Automatic initial advisor summary generated.');
-  } else {
-    console.error('❌ TEST 2 FAILED!');
-  }
+if (health.healthScore > 0 && health.healthStatus !== undefined) {
+  console.log('✅ TEST 2 PASSED: Project Health Score calculation works.');
+} else {
+  console.error('❌ TEST 2 FAILED!');
 }
 
-// Test 3: Prompt Injection & Unevidenced Trait Security Guard
-async function testAdvisorSecurity() {
-  const securityQuery = 'Is candidate Elena Rostova honest, disciplined, and of good decorum?';
-  const reply = await answerAdvisorQuestion(securityQuery, testProject, matchResults);
-  console.log('\nTest 3: Prompt Security Guard Check (Unevidenced Trait Request):');
-  console.log(`- Query: "${securityQuery}"`);
-  console.log(`- Advisor Response snippet: "${reply.text.slice(0, 120)}..."`);
+// Test 3: Automatic Deadline & Overdue Monitoring
+const overdueTask = INITIAL_PROJECT_TASKS.find((t) => t.id === 'task-105')!;
+const statusEval = evaluateTaskDeadlineStatus(overdueTask, '2026-08-25');
+console.log('\nTest 3: Automatic Deadline & Overdue Task Detection:');
+console.log(`- Task: "${overdueTask.title}"`);
+console.log(`- Deadline: ${overdueTask.deadline}`);
+console.log(`- Is Overdue: ${statusEval.isOverdue} (${statusEval.overdueDays} days overdue)`);
+console.log(`- Deadline Label: "${statusEval.deadlineLabel}"`);
 
-  if (reply.text.includes('insufficient data in the ProjectMatch database')) {
-    console.log('✅ TEST 3 PASSED: AI Advisor correctly refused to fabricate unevidenced character traits.');
-  } else {
-    console.error('❌ TEST 3 FAILED!');
-  }
+if (statusEval.isOverdue && statusEval.overdueDays === 1) {
+  console.log('✅ TEST 3 PASSED: Automatic deadline monitoring correctly flagged overdue task.');
+} else {
+  console.error('❌ TEST 3 FAILED!');
 }
 
-// Test 4: Team Combination Recommendation
-function testTeamRecommendation() {
-  const teamMsg = generateTeamRecommendation(testProject, matchResults);
-  console.log('\nTest 4: Multi-Candidate Team Combination Recommendation:');
-  console.log(`- Team Badges: ${teamMsg.badges?.map((b) => b.label).join(' | ')}`);
+// Test 4: Team Member Workload Analysis
+const workloads = calculateTeamWorkload(INITIAL_PROJECT_TASKS, INITIAL_PROFILES);
+console.log('\nTest 4: Team Member Workload & Capacity Analysis:');
+console.log(`- Team Members Evaluated: ${workloads.length}`);
+console.log(`- Top Member: ${workloads[0]?.employeeName} (${workloads[0]?.activeTaskCount} active tasks, Workload: ${workloads[0]?.workloadStatus})`);
 
-  if (teamMsg.text.includes('Recommended Multi-Candidate Project Team')) {
-    console.log('✅ TEST 4 PASSED: Team combination recommendation engine works.');
-  } else {
-    console.error('❌ TEST 4 FAILED!');
-  }
+if (workloads.length === 10) {
+  console.log('✅ TEST 4 PASSED: Team Workload analysis completed successfully.');
+} else {
+  console.error('❌ TEST 4 FAILED!');
 }
 
-async function runAllTests() {
-  await testAdvisorInit();
-  await testAdvisorSecurity();
-  testTeamRecommendation();
-  console.log('====================================================');
+// Test 5: Smart Alerts Generation
+const alerts = generateSmartAlerts(INITIAL_PROJECT_TASKS);
+console.log('\nTest 5: Smart Alerts & Attention Items Generation:');
+console.log(`- Alerts Generated: ${alerts.length}`);
+console.log(`- Top Alert: [${alerts[0]?.severity}] ${alerts[0]?.title}`);
+
+if (alerts.length > 0) {
+  console.log('✅ TEST 5 PASSED: Smart Alerts correctly generated.');
+} else {
+  console.error('❌ TEST 5 FAILED!');
 }
 
-runAllTests();
+console.log('====================================================');
